@@ -1,105 +1,125 @@
 const sheetURL = 'https://docs.google.com/spreadsheets/d/1H0pvW1hrIi3zCNPrIRN_oOKzN8Hw2RaY8vXERcmLiSU/gviz/tq?tqx=out:json&sheet=Sheet1';
-
-const allMonthNames = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
-let months = [];
-const today = new Date();
+const container = document.getElementById("race-container");
+const searchInput = document.getElementById("search");
 
 fetch(sheetURL)
   .then(res => res.text())
   .then(raw => {
     const json = JSON.parse(raw.substring(47).slice(0, -2));
     const rows = json.table.rows;
+    const today = new Date();
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-    const allRaces = [];
+    const races = [];
 
     rows.forEach(row => {
-      const rawMonth = row.c[0]?.v || "";
-      const date = row.c[1]?.v || "";
-      const name = row.c[2]?.v || "";
-      const distance = row.c[3]?.v || "";
-      const location = row.c[4]?.v || "";
-      const link = row.c[5]?.v || "";
+      const rawDate = row.c[2]?.v;
+      const name = row.c[3]?.v || "";
+      const distance = row.c[4]?.v || "";
+      const location = row.c[5]?.v || "";
+      const link = row.c[6]?.v || "";
 
-      if (!date) return;
+      const match = rawDate?.match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (!match) return;
 
-      const raceDate = new Date(date);
-      const month = rawMonth.trim().charAt(0).toUpperCase() + rawMonth.trim().slice(1).toLowerCase();
+      const [_, y, m, d] = match;
+      const date = new Date(Number(y), Number(m), Number(d));
+      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (dateOnly < todayOnly) return;
 
-      allRaces.push({ month, date, name, distance, location, link, raceDate });
+      const prettyDate = date.toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric"
+      });
+
+      const isToday = dateOnly.getTime() === todayOnly.getTime();
+      const isWeekend = [0, 6].includes(dateOnly.getDay());
+
+      races.push({
+        name, distance, location, link,
+        date, prettyDate, isToday, isWeekend
+      });
     });
 
-    // Sort races by date
-    allRaces.sort((a, b) => a.raceDate - b.raceDate);
+    // 🔍 Check if April races are still upcoming
+    const currentYear = today.getFullYear();
+    const hasAprilRacesRemaining = races.some(r =>
+      r.date.getMonth() === 3 && // April
+      r.date.getFullYear() === currentYear &&
+      r.date >= todayOnly
+    );
 
-    const latestRace = allRaces[allRaces.length - 1];
-    const latestMonthIndex = allMonthNames.indexOf(latestRace.month);
+    // 📆 Months to show
+    const displayMonths = ["May", "June", "July", "August", "September", "October", "November", "December"];
+    let monthsToShow = [];
 
-    // Decide the start index
-    const startMonthIndex = today > latestRace.raceDate
-      ? (latestMonthIndex + 1) % 12
-      : today.getMonth();
-
-    // Define the next 4 months
-    months = [];
-    for (let i = 0; i < 6; i++) { // check 6 ahead in case March is skipped
-      const monthName = allMonthNames[(startMonthIndex + i) % 12];
-      if (monthName !== "March" && months.length < 4) {
-        months.push(monthName);
-      }
+    if (hasAprilRacesRemaining) {
+      monthsToShow = ["April", "May", "June", "July"];
+    } else {
+      const startIndex = displayMonths.indexOf("May");
+      monthsToShow = displayMonths.slice(startIndex, startIndex + 4);
     }
 
-    // Build monthMap
+    // 🧠 Group races by month+year
     const monthMap = {};
-    months.forEach(month => {
-      monthMap[month] = [];
-    });
+    races.sort((a, b) => a.date - b.date);
+    races.forEach(race => {
+      const raceMonth = race.date.toLocaleString('default', { month: 'long' });
+      const raceYear = race.date.getFullYear();
+      const groupKey = `${raceMonth} ${raceYear}`;
 
-    allRaces.forEach(race => {
-      if (months.includes(race.month)) {
-        monthMap[race.month].push(race);
+      if (monthsToShow.includes(raceMonth) && raceYear === currentYear) {
+        if (!monthMap[groupKey]) monthMap[groupKey] = [];
+        monthMap[groupKey].push(race);
       }
     });
 
-    renderRaces(monthMap, months);
-  })
-  .catch(error => {
-    console.error("Error loading data from Google Sheets:", error);
-    document.getElementById("race-grid").innerHTML = "<p>Could not load races.</p>";
-  });
+    // 🖼️ Render races
+    function render(filteredRaces = monthMap) {
+      container.innerHTML = "";
+      Object.keys(filteredRaces).forEach(month => {
+        if (filteredRaces[month].length === 0) return;
 
-function renderRaces(monthMap, months) {
-  const container = document.getElementById("race-grid");
-  container.innerHTML = ""; // Clear previous entries
+        const section = document.createElement("div");
+        section.classList.add("month-section");
+        section.innerHTML = `<div class="month-title">${month}</div><div class="race-grid"></div>`;
 
-  months.forEach(month => {
-    if (monthMap[month].length === 0) return;
+        const grid = section.querySelector(".race-grid");
+        filteredRaces[month].forEach(race => {
+          const div = document.createElement("div");
+          div.className = "race-card";
 
-    const box = document.createElement("div");
-    box.classList.add("month-square");
+          if (race.isToday) div.classList.add("today");
+          else if (race.isWeekend) div.classList.add("weekend");
+          else div.classList.add("weekday");
 
-    const title = document.createElement("div");
-    title.classList.add("month-title");
-    title.textContent = month;
-    box.appendChild(title);
+          div.innerHTML = `
+            <div class="race-title">${race.name}</div>
+            <div class="race-details">
+              ${race.prettyDate} · ${race.location}<br>
+              ${race.distance}<br>
+              ${race.link ? `<a href="${race.link}" target="_blank">Event Info</a>` : ""}
+            </div>
+          `;
+          grid.appendChild(div);
+        });
 
-    monthMap[month].forEach(race => {
-      const raceDiv = document.createElement("div");
-      raceDiv.classList.add("race");
-      raceDiv.innerHTML = `
-        <div class="race-title">${race.name}</div>
-        <div class="race-details">
-          ${race.date} · ${race.location}<br>
-          ${race.distance ? `${race.distance} · ` : ""}
-          ${race.link ? `<a href="${race.link}" target="_blank">Event Info</a>` : ""}
-        </div>
-      `;
-      box.appendChild(raceDiv);
+        container.appendChild(section);
+      });
+    }
+
+    // 🔍 Filter functionality
+    searchInput.addEventListener("input", () => {
+      const term = searchInput.value.toLowerCase();
+      const filtered = {};
+      Object.keys(monthMap).forEach(month => {
+        filtered[month] = monthMap[month].filter(race =>
+          race.name.toLowerCase().includes(term) ||
+          race.location.toLowerCase().includes(term) ||
+          race.distance.toLowerCase().includes(term)
+        );
+      });
+      render(filtered);
     });
 
-    container.appendChild(box);
+    render();
   });
-}
