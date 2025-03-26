@@ -82,8 +82,33 @@ h1 {
 .key-box.weekday {
   background-color: #9c27b0;
 }
+
+#refresh-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin: 1rem auto;
+  display: block;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+#refresh-button:hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+}
+
+#refresh-button:active {
+  transform: scale(0.98);
+}
+
 @media (max-width: 600px) {
   .search-bar {
     flex-direction: column;
   }
 }
+
