@@ -22,7 +22,6 @@ function loadRaces() {
         const location = row.c[5]?.v || "";
         const link = row.c[6]?.v || "";
 
-        // ✅ Fixed regex for Google Sheets date
         const match = rawDate?.match(/Date\((\d+),(\d+),(\d+)\)/);
         if (!match) return;
 
@@ -44,18 +43,6 @@ function loadRaces() {
         });
       });
 
-      // ✅ SMART LOGIC: include April only if races remain
-      const currentYear = today.getFullYear();
-      const hasAprilRacesRemaining = races.some(r =>
-        r.date.getMonth() === 3 && // April
-        r.date.getFullYear() === currentYear &&
-        r.date >= todayOnly
-      );
-
-      const monthsToShow = hasAprilRacesRemaining
-        ? ["April", "May", "June", "July"]
-        : ["May", "June", "July", "August"];
-
       monthMap = {};
       races.sort((a, b) => a.date - b.date);
       races.forEach(race => {
@@ -63,13 +50,11 @@ function loadRaces() {
         const raceYear = race.date.getFullYear();
         const groupKey = `${raceMonth} ${raceYear}`;
 
-        if (monthsToShow.includes(raceMonth) && raceYear === currentYear) {
-          if (!monthMap[groupKey]) monthMap[groupKey] = [];
-          monthMap[groupKey].push(race);
-        }
+        if (!monthMap[groupKey]) monthMap[groupKey] = [];
+        monthMap[groupKey].push(race);
       });
 
-      render(); // ⬅️ refresh race grid
+      render(); // refresh race grid
     });
 }
 
@@ -106,7 +91,7 @@ function render(filteredRaces = monthMap) {
   });
 }
 
-// 🔍 Filter with live search
+// 🔍 Live search filter
 searchInput.addEventListener("input", () => {
   const term = searchInput.value.toLowerCase();
   const filtered = {};
@@ -125,7 +110,7 @@ document.getElementById("refresh-button").addEventListener("click", () => {
   loadRaces();
 });
 
-// 🔁 Optional: auto-refresh every 2 minutes
+// 🔁 Optional auto-refresh every 2 minutes
 // setInterval(loadRaces, 2 * 60 * 1000);
 
-loadRaces(); // ⬅️ Initial page load
+loadRaces(); // Initial page load
